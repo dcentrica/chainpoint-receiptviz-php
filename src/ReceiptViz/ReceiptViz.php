@@ -1,6 +1,6 @@
 <?php
 
-namespace Dcentrica\Chainpoint\Graphviz;
+namespace Dcentrica\ReceiptViz;
 
 use \Exception;
 
@@ -9,11 +9,16 @@ use \Exception;
  * @package dcentrica-chainpoint-tools
  * @license BSD-3
  *
- * Works with v3 Chainpoint Receipts and Graphviz libraries to produce visual representations of chainpoint data
- * in any format supported by Graphviz itself.
+ * Works with v3 Chainpoint Receipts and Graphviz libraries to produce visual
+ * representations of chainpoint data in any format supported by Graphviz itself.
+ *
+ * Hat-tip to the chainpoint-parse JS project for guidance on how to construct
+ * hashes in accordance with a chainpoint proof.
+ * @see https://github.com/chainpoint/chainpoint-parse
  */
 class ReceiptViz
 {
+
     /**
      * @var string
      */
@@ -33,17 +38,17 @@ class ReceiptViz
             throw new Exception('Graphviz dot program not available!');
         }
 
-	$this->setReceipt($receipt);
-	$this->setChain($chain);
+        $this->setReceipt($receipt);
+        $this->setChain($chain);
     }
 
     /**
      * Set the current valid blockchain network for working with.
-     * 
+     *
      * @param  string $chain e.g. 'bitcoin'
      * @return ReceiptViz
      */
-    public function setChain(string $chain) : ReceiptViz
+    public function setChain(string $chain): ReceiptViz
     {
         $this->chain = $chain;
 
@@ -52,13 +57,13 @@ class ReceiptViz
 
     /**
      * Set the current Chainpoint receipt for working with.
-     * 
+     *
      * @param  string $receipt
      * @return ReceiptViz
      */
-    public function setReceipt(string $receipt) : ReceiptViz
+    public function setReceipt(string $receipt): ReceiptViz
     {
-        $this->receipt = $chain;
+        $this->receipt = $receipt;
 
         return $this;
     }
@@ -66,7 +71,7 @@ class ReceiptViz
     /**
      * @return string The current chainpoint receipt
      */
-    public function getReceipt() : string
+    public function getReceipt(): string
     {
         return $this->receipt;
     }
@@ -74,7 +79,7 @@ class ReceiptViz
     /**
      * @return string The current chain
      */
-    public function getChain() : string
+    public function getChain(): string
     {
         return $this->chain;
     }
@@ -88,62 +93,75 @@ class ReceiptViz
      * @return string        A stringy representation of a dotfile for use by Graphviz.
      * @throws Exception
      */
-    public function toDot(string $hash, string $root) : string
+    public function toDot(string $hash, string $root): string
     {
-	// Prepare a dot file template
-        $dotTpl = 'digraph G { node [shape = record] node0 [ label =\"<f0> | <f1> $root | <f2> \"]; %s %s }';
+        // Prepare a dot file template
+        $template = implode(PHP_EOL, [
+            'digraph G {',
+            'node [shape = record]',
+            "node0 [ label =\"<f0> | <f1> $hash | <f2> \"];",
+            '%s %s',
+            '}'
+        ]);
 
-	// Let's get and process the "ops" array
-	$getOps = sprintf('get%sOps', $this->getChain());
+        // Let's get and process the "ops" array
+        $method = sprintf('get%sOps', $this->getChain());
+        $ops = $this->$method();
         $currHashVal = $hash;
         $dotFileArr = ['s1' => [], 's2' => []];
-        $i = 0;
+        $i = 1;
 
         // Assumes hex data
-        foreach ($this->$getOps() as $op => $val) {
+        foreach ($ops as $op => $val) {
             $op = key($val);
             $val = current($val);
-            $hasNext = !empty($ops[$i+1]);
-            $isLast = $i+1 === sizeof($ops);
+
+            if ($op === 'anchors') {
+                continue;
+            }
+
+            $hasNext = !empty($ops[$i + 1]);
+            $isLast = $i + 1 === sizeof($ops);
 
             for ($j = 1; $j <= 2; $j++) {
                 if ($op === 'r') {
-                    $currHashVal = self::hash($ops[$i+1]['op'], $currHashVal . $val);
+                    $currHashVal = $currHashVal . $val;
                 } else if ($op === 'l') {
-                    $currHashVal = self::hash($ops[$i+1]['op'], $val . $currHashVal);
+                    $currHashVal = $val . $currHashVal;
+                } else {
+                    $currHashVal = self::hash($val, $currHashVal);
                 }
 
                 $isSection1 = ($j === 1);
                 $isSection2 = ($j === 2);
                 $currNodeIdx = $i;
-                $nextNodeIdx = $isLast ? $i+2 : $i+1;
+                $nextNodeIdx = $isLast ? $i + 2 : $i + 1;
 
-		// Section 1 defines the construction of the dotfile node definitions
+                // Section 1 defines the construction of the dotfile node definitions
                 if ($isSection1) {
-                    $dotFileArr['s1'][] = "node$currNodeIdx [ label =\"<f0> | <f1> $currHashVal | <f2> \"]; ";
-		// Section 2 defines the relation of each node to one another
+                    // Push the merkle root onto the end
+                    if ($isLast) {
+                        $dotFileArr['s1'][] = "node$currNodeIdx [ label =\"<f0> | <f1> $root | <f2> \"];" . PHP_EOL;
+                    } else {
+                        $dotFileArr['s1'][] = "node$currNodeIdx [ label =\"<f0> | <f1> $currHashVal | <f2> \"];" . PHP_EOL;
+                    }
+                    // Section 2 defines the relation of each node to one another
                 } else if ($isSection2) {
                     if (!$isLast) {
-                        $dotFileArr['s2'][] = "\"node$currNodeIdx\":f1 -> \"node$nextNodeIdx\":f1; ";
+                        $dotFileArr['s2'][] = "\"node$currNodeIdx\":f1 -> \"node$nextNodeIdx\":f1;" . PHP_EOL;
                     }
                 }
-            }
-
-            // Push the merkle root onto the end
-            if ($isLast) {
-                $val = "\"node$currNodeIdx\":f1 -> \"node$nextNodeIdx\":f1;";
-                array_push($dotFileArr['s2'], $root);
             }
 
             ++$i;
         }
 
         // Assemble the pieces
-        $return sprintf(
-	    $dotTpl,
-	    implode(' ', $dotFileArr['s1']),
-	    implode(' ', $dotFileArr['s2'])
-	)
+        return sprintf(
+            $template,
+            implode('', $dotFileArr['s1']),
+            implode('', $dotFileArr['s2'])
+        );
     }
 
     /**
@@ -152,20 +170,21 @@ class ReceiptViz
      * @return array
      * @throws Exception
      */
-    public function getBitcoinOps() : array
+    public function getBitcoinOps(): array
     {
         $receipt = json_decode($this->getReceipt(), true);
+        $branch = $receipt['branches'][0]['branches'][0];
 
-	if (!isset($branch = $receipt['branches']['branches'])) {
-	    throw new Exception('Invalid receipt! Sub branches not found.');
-	}
-
-	if (!isset($branch['label']) || $branch['label'] !== 'btc') {
-	    throw new Exception('Invalid receipt! "btc" sub-branch not found.');
+        if (empty($branch)) {
+            throw new Exception('Invalid receipt! Sub branches not found.');
         }
 
-	if (empty($branch['ops'])) {
-	    throw new Exception('Invalid receipt! "btc" ops data not found.');
+        if (!isset($branch['label']) || $branch['label'] !== 'btc_anchor_branch') {
+            throw new Exception('Invalid receipt! "btc" sub-branch not found.');
+        }
+
+        if (empty($branch['ops'])) {
+            throw new Exception('Invalid receipt! "btc" ops data not found.');
         }
 
         return $branch['ops'];
@@ -176,34 +195,33 @@ class ReceiptViz
      * @param  string $cmd
      * @return bool
      */
-    public static function which(string $cmd) : bool
+    public static function which(string $cmd): bool
     {
         $output = [];
         $return = 0;
 
         exec("which $cmd", $output, $return);
 
-	return $return === 0;
+        return $return === 0;
     }
 
     /**
-     * Simple hashing in a chainpoint receipt context. 
+     * Simple hashing in a chainpoint receipt context.
      *
      * @param  string $func The hash function to use.
      * @param  string $subj The string to hash.
      * @return string       The hashed string.
      */
-    public function hash(string $func, string $subj) : string
+    public function hash(string $func, string $subj): string
     {
-	$parts = explode('-', $func);
-	$func = "{$parts[0]}{$parts[1]}";
+        $parts = explode('-', $func);
+        $func = "{$parts[0]}{$parts[1]}";
 
         if (count($parts) === 3) {
             return hash($func, hash($func, $subj));
         }
 
-       return hash($func, $subj);
+        return hash($func, $subj);
     }
 
 }
-
