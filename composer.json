@@ -1,0 +1,27 @@
+{
+    "name": "dcentrica/chainpoint-receiptviz-php",
+    "type": "vendormodule",
+    "license": "BSD-3-Clause",
+    "description": "Generate graphical representations of a Chainpoint receipt",
+    "keywords": ["chainpoint", "visualisation", "visualise", "visualize", "graphviz", "bitcoin", "blockchain"],
+    "authors": [
+        {
+            "name": "Russell Michell",
+            "homepage": "http://dcentrica.io/",
+            "email" : "russ@theruss.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.0"
+    },
+    "require-dev": {
+        "phpunit/PHPUnit": "^5.7"
+    },
+    "config": {
+        "process-timeout": 900
+    },
+    "extra": {
+        "installer-name": "chainpoint-receiptviz"
+    },
+    "minimum-stability": "dev"
+}
