@@ -1,17 +1,24 @@
-# What is this?
+## What is this?
 
-A tool used to generate graphical representations of a [Chainpoint Proof](https://chainpoint.org) JSON-LD document.
+A low level tool which can be used to generate graphical representations of a [Chainpoint Proof](https://chainpoint.org) JSON-LD document. It partially mimics the behaviour of the `parseBranches()` function
+out of the [chainpoint-parse](https://github.com/chainpoint/chainpoint-parse) JS lib, but generates a visualisation also.
 
-# Requirements
+## Requirements
 
 * [PHP7.0](https://secure.php.net/) or higher.
 * [Graphviz](https://graphviz.org/).
 
-# Installation
+## Installation
 
-    #> composer require dcentrica/chainpoint-receiptviz-php
+Composer not yet available..just clone it.
 
-# Usage
+    #> composer require dcentrica/chainpoint-receiptviz
+
+## Notes
+
+There are several chainpoint specification versions, with a version 4 currently under development. This library only supports the current v3 standard. Having said that, it shouldn't be too hard to modify the library to suit other versions.
+
+## Usage
 
     <?php
     // Use an autoloader instead!
@@ -21,19 +28,16 @@ A tool used to generate graphical representations of a [Chainpoint Proof](https:
 
     // Generate an SVG file named "/tmp/chainpoint.svg"
     // from a valid chainpont receipt.
-    $viz = new \Dcentrica\ReceiptViz\ReceiptViz();
+    $viz = new \Dcentrica\Viz\ChainpointViz();
     $viz->setChain('bitcoin');
     $viz->setReceipt($receipt);
     $viz->setFormat('svg');
     $viz->setFilename('/tmp/chainpoint');
-    // You'd fetch this via blockchain.info or programmatically via the "anchors" element in any chainpoint proof
-    $viz->setRoot(hash('sha256', 'thisismymerkleroot'));
+    
+    // Visualise all the things..
+    $viz->visualise();
 
-    $viz->visualize();
-
-    ?>
-
-# Credits
+## Credits
 
 Kudos to the [Tierion](https://tierion.com/) guys, especially for the [chainpoint-parse](https://github.com/chainpoint/chainpoint-parse) JS lib which led me to understand how
 a chainpoint document is put together.
