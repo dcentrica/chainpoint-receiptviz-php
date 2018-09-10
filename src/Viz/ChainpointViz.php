@@ -3,7 +3,7 @@
 namespace Dcentrica\Viz;
 
 use \Exception;
-use Dcentrica\Viz\HashUtils;
+use Dcentrica\Viz\HashUtils as HU;
 
 /**
  * @author  Russell Michell 2018 <russ@theruss.com>
@@ -33,11 +33,6 @@ class ChainpointViz
     protected $format = 'png';
     protected $filename = 'chainpoint';
     protected $root = '';
-
-    /**
-     * @var array
-     */
-    private $currHashVal;
 
     /**
      * The value used to decide from how many ops behind the first occurrence of a
@@ -161,7 +156,8 @@ class ChainpointViz
      */
     public function parseBranches(): string
     {
-        $this->currHashVal = $this->getHash();
+        $currHashVal = HU::buffer_from($this->getHash(), 'hex');
+        $currHashViz = HU::buffer_digest_from($currHashVal);
 
         // Prepare a dot file template
         $dotTpl = sprintf(implode(PHP_EOL, [
@@ -175,63 +171,77 @@ class ChainpointViz
             '}'
             ]),
             date('Y-m-d H:i:s'),
-            $this->currHashVal,
+            $currHashViz,
             '%s',
             '%s'
         );
 
-        // Let's get and process the desired "ops" array
-        $opsBranch = $this->getOps();
-        $total = sizeof($opsBranch);
+        // Process the desired "ops" arrays
+        $ops = $this->getOps();
+        $total = sizeof($ops[0]) + sizeof($ops[1]);
 
         // Init the dotfile's sections
         $dotFileArr = ['s1' => [], 's2' => []];
 
         // Marker used to help calculate the value in BTC's OP_RETURN
         $isFirst256x2 = false;
-        $opRet = 0; // OP_RETURN index
         $i = 1;
 
-        foreach ($opsBranch as $key => $data) {
-            foreach ($data as $op => $val) {
-                if (is_string($op)) {
-                    if ($op === 'r') {
-                        $this->currHashVal = $this->currHashVal . $val;
-                    } else if ($op === 'l') {
-                        $this->currHashVal = $val . $this->currHashVal;
-                    } else if ($op === 'op') {
-                        switch ($algo = $val) {
-                            default:
-                            case 'sha-256':
-                                $this->currHashVal = hash('sha256', $this->currHashVal);
-                                break;
-                            case 'sha-256-x2':
-                                if (!$isFirst256x2) {
-                                    $isFirst256x2 = true;
-                                    // Cache this index. It's used to calculate the OP_RETURN value
-                                    // TODO Write getOpReturn() method
-                                    $opRet = ($i - self::CHAINPOINT_OP_POINT);
-                                }
+        // $ops: <cal_or_btc> => <array>
+        foreach ($ops as $data) {
+            foreach ($data as $val) {
+                list ($op, $val) = [key($val), current($val)];
 
-                                $this->currHashVal = hash('sha256', hash('sha256', $this->currHashVal));
-                                break;
-                        }
+                if ($op === 'r') {
+                    // Hex data is treated as hex. Otherwise it's converted to bytes assuming a utf8 encoded string
+                    $concatValue = HU::is_hex($val) ? HU::buffer_from($val, 'hex') : HU::buffer_from($val, 'utf8');
+                    $currHashVal = HU::buffer_concat($currHashVal, $concatValue);
+                    $currHashViz = HU::buffer_digest_from($currHashVal);
+                } else if ($op === 'l') {
+                    // Hex data is treated as hex. Otherwise it's converted to bytes assuming a utf8 encoded string
+                    $concatValue = HU::is_hex($val) ? HU::buffer_from($val, 'hex') : HU::buffer_from($val, 'utf8');
+                    $currHashVal = HU::buffer_concat($concatValue, $currHashVal);
+                    $currHashViz = HU::buffer_digest_from($currHashVal);
+                } else if ($op === 'op') {
+                    switch ($val) {
+                        case 'sha-256':
+                            $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
+                            $currHashViz = HU::buffer_digest_from($currHashVal);
+                            break;
+                        case 'sha-256-x2':
+                            // The ID at the location where the OP_RETURN is
+                            // the first double-hash, is the ID of the BTC TXID
+                            if (!$isFirst256x2) {
+                                $isFirst256x2 = true;
+                                $btcTxIdOpIndex = ($i - 1);
+                                $opReturnIndex = ($btcTxIdOpIndex - self::CHAINPOINT_OP_POINT);
+                            }
+
+                            $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
+                            $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
+                            $currHashViz = HU::buffer_digest_from($currHashVal);
+                            break;
+                    }
+                } else if ($op === 'anchors') {
+                    if ($val[0]['type'] !== 'cal') {
+                        $currHashVal = $currHashVal;
+                        $currHashViz = HU::buffer_digest_from($currHashVal);
                     }
                 }
 
-                // Build section 1 of the dotfile
-                // Use $i + 1 to cater for the "manual" idx zero used in the template
                 $currNodeIdx = $i;
                 $nextNodeIdx = ($currNodeIdx + 1);
 
+                // Build section 1 of the dotfile
                 if ($nextNodeIdx <= $total) {
                     $dotFileArr['s1'][] = sprintf(
                         'node%d [ label = "<f0> | <f1> %s | <f2> "];',
                         $currNodeIdx,
-                        $this->currHashVal
+                        $currHashViz
                     );
                 }
 
+                // Build section 2 of the dotfile
                 if ($nextNodeIdx < $total) {
                     $dotFileArr['s2'][] = sprintf(
                         '"node%d":f1 -> "node%d":f1;',
@@ -295,8 +305,19 @@ class ChainpointViz
     }
 
     /**
-     * Flattens the branches structure from the chainpoint format, to make it
-     * easier to work with.
+     * Returns the chainpoint version from the passed $receipt.
+     *
+     * @param  array $receipt A JSON decoded array of a chainpoint receipt.
+     * @return int
+     */
+    public function chainpointVersion(array $receipt) : int
+    {
+        return (int) preg_replace('#[^\d]+#', '', explode('/', $receipt['@context'])[4]);
+    }
+
+    /**
+     * Flattens the branches structure from the chainpoint receipt format to
+     * make it easier to work with.
      *
      * @return array
      * @throws Exception
@@ -309,12 +330,27 @@ class ChainpointViz
             throw new Exception('Invalid receipt! Sub branches not found.');
         }
 
-        $branchStruct = array_merge(
-            $receipt['branches'][0]['ops'], // cal
-            $receipt['branches'][0]['branches'][0]['ops'] // btc
-        );
+        if ($this->chainpointVersion($receipt) !== 3) {
+            throw new Exception('Invalid receipt! Only v3 receipts are currently supported.');
+        }
 
-        return $branchStruct;
+        $ops = [];
+
+        foreach ($receipt['branches'][0] as $ckey => $cval) {
+            if ($ckey === 'ops') {
+                // Gives us all CAL ops and anchors
+                $ops[] = $cval;
+            } else if ($ckey === 'branches') {
+                foreach ($cval[0] as $bckey => $bcval) {
+                    // Gives us all BTC ops and anchors (and any others added in the future)
+                    if ($bckey === 'ops') {
+                        $ops[] = $bcval;
+                    }
+                }
+            }
+        }
+
+        return $ops;
     }
 
     /**

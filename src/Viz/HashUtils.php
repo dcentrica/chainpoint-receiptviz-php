@@ -7,31 +7,11 @@ namespace Dcentrica\Viz;
  * @package dcentrica-chainpoint-tools
  * @license BSD-3
  *
- * Rather simple conversion and transformation routines for chainpoint hashes.
+ * Rather simple conversion and transformation routines for chainpoint hashes,
+ * very loosely based on NodeJS' Buffers.
  */
 class HashUtils
 {
-    /**
-     * Simple hashing in a chainpoint receipt context. Deals with e.g. 'sha-256'
-     * and 'sha-256-x2'.
-     *
-     * @param  string $func The hash function to use as defined in a chainpoint
-     *                      receipt.
-     * @param  string $subj The string to hash.
-     * @return string       The hashed string.
-     */
-    public static function hash(string $func, string $subj): string
-    {
-        $parts = explode('-', $func);
-        $func = "{$parts[0]}{$parts[1]}";
-
-        if (sizeof($parts) === 3) {
-            return hash($func, hash($func, $subj));
-        }
-
-        return hash($func, $subj);
-    }
-
     /**
      * Take any string and convert it to hex.
      *
@@ -44,12 +24,12 @@ class HashUtils
     }
 
     /**
-     * Take an array of bytes, and produces a stringy representation of it.
+     * Take an array of bytes, and produce a raw binary representation of it.
      *
      * @param  array  $bytes
-     * @return string
+     * @return string $chars A raw binary string
      */
-    public static function buffer_to_char(array $bytes) : string
+    public static function buffer_to_bin(array $bytes) : string
     {
         $chars = '';
 
@@ -61,17 +41,17 @@ class HashUtils
     }
 
     /**
-     * Convert an array of decimals derived from a hash, back into that original
-     * hash - its "digest".
+     * Convert an array of bytes derived from a hash, back into that original
+     * hash (aka a digest).
      *
      * @param  array $dec An array of decimals
      * @return string
      */
-    public static function buffer_digest_from(array $dec) : string
+    public static function buffer_digest_from(array $bytes) : string
     {
         $hex = '';
 
-        foreach($dec as $int) {
+        foreach($bytes as $int) {
             // Left pad single hex values with zeroes, to match chainpoint hashes
             $hex .= str_pad(dechex($int), 2, '0', STR_PAD_LEFT);
         }
@@ -102,7 +82,7 @@ class HashUtils
     }
 
     /**
-     * Concatenate two buffers.
+     * Concatenate two "buffers".
      *
      * @param  array $lhs
      * @param  array $rhs
@@ -114,18 +94,29 @@ class HashUtils
     }
 
     /**
-     * Reverses the endianness of a given hash to allow for interopability
-     * between the Bitcoin blockchain and other systems, namely the Chainpoint
-     * network.
+     * Reverses the endianness of a given string to allow for interopability
+     * between the Bitcoin blockchain and other systems, namely Tierion's
+     * Chainpoint network.
      *
-     * @param  string $hash
+     * @param  string $string
      * @return string
      */
-    public static function switch_endian(string $hash) : string
+    public static function switch_endian(string $string) : string
     {
-        $buffer = self::buffer_from($hash);
+        $buffer = self::buffer_from($string);
 
         return self::buffer_digest_from(array_reverse($buffer));
+    }
+
+    /**
+     * Determine if the passed $string in hex format.
+     *
+     * @param  string $string
+     * @return bool
+     */
+    public static function is_hex(string $string) : bool
+    {
+        return ctype_xdigit($string);
     }
 
 }
