@@ -159,12 +159,16 @@ class ChainpointViz
         $currHashVal = HU::buffer_from($this->getHash(), 'hex');
         $currHashViz = HU::buffer_digest_from($currHashVal);
 
+        // Output graphic fill styles
+        $nodeStyle = false;
+        $nodeStyleMarkup = ',style="filled", fillcolor="#000000", fontcolor="#FFFFFF"';
+
         // Prepare a dot file template
         $dotTpl = sprintf(implode(PHP_EOL, [
             'digraph G {',
             '// Generated on: %s',
             'node [shape = record]',
-            "node0 [ label =\"<f0> | <f1> %s | <f2> \"];",
+            'node0 [ label="<f0> | <f1> %s | <f2> " %s];',
             '%s',
             "\"node0\":f1 -> \"node1\":f1;",
             '%s',
@@ -172,6 +176,7 @@ class ChainpointViz
             ]),
             date('Y-m-d H:i:s'),
             $currHashViz,
+            $nodeStyleMarkup,
             '%s',
             '%s'
         );
@@ -182,9 +187,7 @@ class ChainpointViz
 
         // Init the dotfile's sections
         $dotFileArr = ['s1' => [], 's2' => []];
-
-        // Marker used to help calculate the value in BTC's OP_RETURN
-        $isFirst256x2 = false;
+        // Start at 1 as we've already pushed the start-hash onto the dotfile
         $i = 1;
 
         foreach ($ops as $data) {
@@ -192,30 +195,26 @@ class ChainpointViz
                 list ($op, $val) = [key($val), current($val)];
 
                 if ($op === 'r') {
+                    $nodeStyle = false;
                     // Hex data is treated as hex. Otherwise it's converted to bytes assuming a utf8 encoded string
                     $concatValue = HU::is_hex($val) ? HU::buffer_from($val, 'hex') : HU::buffer_from($val, 'utf8');
                     $currHashVal = HU::buffer_concat($currHashVal, $concatValue);
                     $currHashViz = HU::buffer_digest_from($currHashVal);
                 } else if ($op === 'l') {
+                    $nodeStyle = false;
                     // Hex data is treated as hex. Otherwise it's converted to bytes assuming a utf8 encoded string
                     $concatValue = HU::is_hex($val) ? HU::buffer_from($val, 'hex') : HU::buffer_from($val, 'utf8');
                     $currHashVal = HU::buffer_concat($concatValue, $currHashVal);
                     $currHashViz = HU::buffer_digest_from($currHashVal);
                 } else if ($op === 'op') {
+                    $nodeStyle = false;
+
                     switch ($val) {
                         case 'sha-256':
                             $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
                             $currHashViz = HU::buffer_digest_from($currHashVal);
                             break;
                         case 'sha-256-x2':
-                            // The ID at the location where the OP_RETURN is
-                            // the first double-hash, is the ID of the BTC TXID
-                            if (!$isFirst256x2) {
-                                $isFirst256x2 = true;
-                                $btcTxIdOpIndex = ($i - 1);
-                                $opReturnIndex = ($btcTxIdOpIndex - self::CHAINPOINT_OP_POINT);
-                            }
-
                             $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
                             $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
                             $currHashViz = HU::buffer_digest_from($currHashVal);
@@ -224,6 +223,7 @@ class ChainpointViz
                 } else if ($op === 'anchors') {
                     if ($val[0]['type'] !== 'cal') {
                         // Merkle Root
+                        $nodeStyle = true;
                         $currHashViz = HU::switch_endian(HU::buffer_digest_from($currHashVal));
                     }
                 }
@@ -232,16 +232,17 @@ class ChainpointViz
                 $nextNodeIdx = ($currNodeIdx + 1);
 
                 // Build section 1 of the dotfile
-                if (($nextNodeIdx - 1)  <= $total) { // subtract 1 as we omit cal's "anchors" array
+                if (($nextNodeIdx - 1)  <= $total) { // subtract 1 (We omit cal's "anchors" array)
                     $dotFileArr['s1'][] = sprintf(
-                        'node%d [ label = "<f0> | <f1> %s | <f2> "];',
+                        'node%d [ label = "<f0> | <f1> %s | <f2> " %s ];',
                         $currNodeIdx,
-                        $currHashViz
+                        $currHashViz,
+                        $nodeStyle ? $nodeStyleMarkup : ''
                     );
                 }
 
                 // Build section 2 of the dotfile
-                if (($nextNodeIdx - 1) < $total) {  // subtract 1 as we omit cal's "anchors" array
+                if (($nextNodeIdx - 1) < $total) {  // subtract 1 (We omit cal's "anchors" array)
                     $dotFileArr['s2'][] = sprintf(
                         '"node%d":f1 -> "node%d":f1;',
                         $currNodeIdx,
