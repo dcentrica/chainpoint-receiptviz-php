@@ -103,7 +103,8 @@ class HashUtils
      */
     public static function switch_endian(string $string) : string
     {
-        $buffer = self::buffer_from($string);
+        $type = self::is_hex($string) ? 'hex' : 'utf8';
+        $buffer = self::buffer_from($string, $type);
 
         return self::buffer_digest_from(array_reverse($buffer));
     }

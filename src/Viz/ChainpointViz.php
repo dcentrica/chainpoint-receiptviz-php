@@ -7,7 +7,7 @@ use Dcentrica\Viz\HashUtils as HU;
 
 /**
  * @author  Russell Michell 2018 <russ@theruss.com>
- * @package dcentrica-chainpoint-tools
+ * @package chainpoint-viz
  * @license BSD-3
  *
  * Works with v3 Chainpoint Receipts and Graphviz libraries to produce simple
@@ -36,7 +36,7 @@ class ChainpointViz
 
     /**
      * The value used to decide from how many ops behind the first occurrence of a
-     * sha256d ('sha-256-x2') hash, we need to go to obtain the Merkle Root.
+     * sha256d ('sha-256-x2') hash, we need to go to obtain the OP_RETURN value.
      *
      * @const int
      */
@@ -187,7 +187,6 @@ class ChainpointViz
         $isFirst256x2 = false;
         $i = 1;
 
-        // $ops: <cal_or_btc> => <array>
         foreach ($ops as $data) {
             foreach ($data as $val) {
                 list ($op, $val) = [key($val), current($val)];
@@ -224,8 +223,8 @@ class ChainpointViz
                     }
                 } else if ($op === 'anchors') {
                     if ($val[0]['type'] !== 'cal') {
-                        $currHashVal = $currHashVal;
-                        $currHashViz = HU::buffer_digest_from($currHashVal);
+                        // Merkle Root
+                        $currHashViz = HU::switch_endian(HU::buffer_digest_from($currHashVal));
                     }
                 }
 
@@ -233,7 +232,7 @@ class ChainpointViz
                 $nextNodeIdx = ($currNodeIdx + 1);
 
                 // Build section 1 of the dotfile
-                if ($nextNodeIdx <= $total) {
+                if (($nextNodeIdx - 1)  <= $total) { // subtract 1 as we omit cal's "anchors" array
                     $dotFileArr['s1'][] = sprintf(
                         'node%d [ label = "<f0> | <f1> %s | <f2> "];',
                         $currNodeIdx,
@@ -242,7 +241,7 @@ class ChainpointViz
                 }
 
                 // Build section 2 of the dotfile
-                if ($nextNodeIdx < $total) {
+                if (($nextNodeIdx - 1) < $total) {  // subtract 1 as we omit cal's "anchors" array
                     $dotFileArr['s2'][] = sprintf(
                         '"node%d":f1 -> "node%d":f1;',
                         $currNodeIdx,
@@ -267,7 +266,6 @@ class ChainpointViz
      * to a pre-determined F/S location.
      *
      * @return int 1 on failure, zero otherwise.
-     * @todo Fix so that no bad things come thru userland code via toDot() passed to exec()
      */
     public function visualise(): int
     {
