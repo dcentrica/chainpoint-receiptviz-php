@@ -12,7 +12,7 @@ out of the [chainpoint-parse](https://github.com/chainpoint/chainpoint-parse) JS
 
 Composer not yet available..just clone it.
 
-    #> composer require dcentrica/chainpoint-receiptviz
+    #> composer require dcentrica/chainpoint-receiptviz-php
 
 ## Notes
 
@@ -21,21 +21,19 @@ There are several chainpoint specification versions, with a version 4 currently 
 ## Usage
 
     <?php
-    // Use an autoloader instead!
-    require(realpath(__DIR__ . '/dcentrica-chainpo/src/ReceiptViz/ReceiptViz.php'));
+    require(realpath(__DIR__ . '/dcentrica-chainpoint-viz/src/Viz/ChainpointViz.php'));
+    require(realpath(__DIR__ . '/dcentrica-chainpoint-viz/src/Viz/HashUtils.php'));
 
-    $receipt = file_get_contents('chainpoint-proof.json');
+    $receipt = file_get_contents('chainpoint.json');
 
-    // Generate an SVG file named "/tmp/chainpoint.svg"
-    // from a valid chainpont receipt.
     $viz = new \Dcentrica\Viz\ChainpointViz();
     $viz->setChain('bitcoin');
     $viz->setReceipt($receipt);
     $viz->setFormat('svg');
-    $viz->setFilename('/tmp/chainpoint');
-    
-    // Visualise all the things..
-    $viz->visualise();
+    $viz->setFilename(realpath(__DIR__) . '/chainpoint');
+    $viz->visualize();
+
+See the "examples" directory for usage and output.
 
 ## Credits
 
