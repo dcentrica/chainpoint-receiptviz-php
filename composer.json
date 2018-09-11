@@ -21,7 +21,7 @@
         "process-timeout": 900
     },
     "extra": {
-        "installer-name": "chainpoint-receiptviz"
+        "installer-name": "chainpoint-receiptviz-php"
     },
     "minimum-stability": "dev"
 }

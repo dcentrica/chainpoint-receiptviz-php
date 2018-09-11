@@ -32,7 +32,6 @@ class ChainpointViz
     protected $receipt = '';
     protected $format = 'png';
     protected $filename = 'chainpoint';
-    protected $root = '';
 
     /**
      * The value used to decide from how many ops behind the first occurrence of a
@@ -111,20 +110,6 @@ class ChainpointViz
     }
 
     /**
-     * Set the desired Merkle Root for display. This isn't available directly from
-     * Chainpoint JSON.
-     *
-     * @param  string $root  The Merkle Root hash as stored on a blockchain.
-     * @return ChainpointViz
-     */
-    public function setRoot(string $root): ChainpointViz
-    {
-        $this->root = $root;
-
-        return $this;
-    }
-
-    /**
      * @return string The current chainpoint receipt
      */
     public function getReceipt(): string
@@ -161,20 +146,26 @@ class ChainpointViz
 
         // Output graphic fill styles
         $nodeStyle = false;
+        $label = 'Start Hash:';
         $nodeStyleMarkup = ',style="filled", fillcolor="#000000", fontcolor="#FFFFFF"';
+        $receipt = json_decode($this->getReceipt(), true);
 
         // Prepare a dot file template
         $dotTpl = sprintf(implode(PHP_EOL, [
             'digraph G {',
+            'labelloc="t";',
+            'label="A Visual Representation of a v%d Chainpoint Proof"',
             '// Generated on: %s',
-            'node [shape = record]',
-            'node0 [ label="<f0> | <f1> %s | <f2> " %s];',
+            'node [shape="record"]',
+            'node0 [label="<f0>%s|<f1>%s" %s];',
             '%s',
-            "\"node0\":f1 -> \"node1\":f1;",
+            '"node0":f1 -> "node1":f1;',
             '%s',
             '}'
             ]),
+            $this->chainpointVersion($receipt),
             date('Y-m-d H:i:s'),
+            $label,
             $currHashViz,
             $nodeStyleMarkup,
             '%s',
@@ -196,11 +187,13 @@ class ChainpointViz
 
                 if ($op === 'r') {
                     $nodeStyle = false;
+                    $label = 'Concat (RHS):';
                     // Hex data is treated as hex. Otherwise it's converted to bytes assuming a utf8 encoded string
                     $concatValue = HU::is_hex($val) ? HU::buffer_from($val, 'hex') : HU::buffer_from($val, 'utf8');
                     $currHashVal = HU::buffer_concat($currHashVal, $concatValue);
                     $currHashViz = HU::buffer_digest_from($currHashVal);
                 } else if ($op === 'l') {
+                    $label = 'Concat (LHS):';
                     $nodeStyle = false;
                     // Hex data is treated as hex. Otherwise it's converted to bytes assuming a utf8 encoded string
                     $concatValue = HU::is_hex($val) ? HU::buffer_from($val, 'hex') : HU::buffer_from($val, 'utf8');
@@ -208,6 +201,7 @@ class ChainpointViz
                     $currHashViz = HU::buffer_digest_from($currHashVal);
                 } else if ($op === 'op') {
                     $nodeStyle = false;
+                    $label = sprintf('OP (%s):', $val);
 
                     switch ($val) {
                         case 'sha-256':
@@ -222,6 +216,7 @@ class ChainpointViz
                     }
                 } else if ($op === 'anchors') {
                     if ($val[0]['type'] !== 'cal') {
+                        $label = 'Merkle Root:';
                         // Merkle Root
                         $nodeStyle = true;
                         $currHashViz = HU::switch_endian(HU::buffer_digest_from($currHashVal));
@@ -232,17 +227,18 @@ class ChainpointViz
                 $nextNodeIdx = ($currNodeIdx + 1);
 
                 // Build section 1 of the dotfile
-                if (($nextNodeIdx - 1)  <= $total) { // subtract 1 (We omit cal's "anchors" array)
+                if (($nextNodeIdx - 1)  <= $total) { // subtract 1 (We've omitted cal's "anchors" array)
                     $dotFileArr['s1'][] = sprintf(
-                        'node%d [ label = "<f0> | <f1> %s | <f2> " %s ];',
+                        'node%d [ label="<f0>%s|<f1>%s" %s ];',
                         $currNodeIdx,
+                        $label,
                         $currHashViz,
                         $nodeStyle ? $nodeStyleMarkup : ''
                     );
                 }
 
                 // Build section 2 of the dotfile
-                if (($nextNodeIdx - 1) < $total) {  // subtract 1 (We omit cal's "anchors" array)
+                if (($nextNodeIdx - 1) < $total) {  // subtract 1 (We've omitted cal's "anchors" array)
                     $dotFileArr['s2'][] = sprintf(
                         '"node%d":f1 -> "node%d":f1;',
                         $currNodeIdx,
