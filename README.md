@@ -1,7 +1,7 @@
 ## What is this?
 
-A low level tool which can be used to generate graphical representations of a [Chainpoint Proof](https://chainpoint.org) JSON-LD document. It partially mimics the behaviour of the `parseBranches()` function
-out of the [chainpoint-parse](https://github.com/chainpoint/chainpoint-parse) JS lib, but generates a visualisation also.
+A standalone tool for producing graphical representations of version 3 [Chainpoint Proof](https://chainpoint.org) JSON-LD documents. It partially mimics the behaviour of the `parseBranches()` function
+out of the [chainpoint-parse](https://github.com/chainpoint/chainpoint-parse) JS lib, with the added ability to produce `.png` or `.svg` visualisations too.
 
 ## Requirements
 
@@ -10,17 +10,16 @@ out of the [chainpoint-parse](https://github.com/chainpoint/chainpoint-parse) JS
 
 ## Installation
 
-Composer not yet available..just clone it.
-
     #> composer require dcentrica/chainpoint-receiptviz-php
 
 ## Notes
 
-There are several chainpoint specification versions, with a version 4 currently under development. This library only supports the current v3 standard. Having said that, it shouldn't be too hard to modify the library to suit other versions.
+There are several chainpoint specification versions, with a version 4 currently under development. This library only supports the current v3 standard.
 
 ## Usage
 
     <?php
+    // Very basic usage
     require(realpath(__DIR__ . '/dcentrica-chainpoint-viz/src/Viz/ChainpointViz.php'));
     require(realpath(__DIR__ . '/dcentrica-chainpoint-viz/src/Viz/HashUtils.php'));
 
@@ -33,9 +32,9 @@ There are several chainpoint specification versions, with a version 4 currently 
     $viz->setFilename(realpath(__DIR__) . '/chainpoint');
     $viz->visualize();
 
-See the "examples" directory for usage and output.
+See the "examples" directory for this example and output.
 
 ## Credits
 
-Kudos to the [Tierion](https://tierion.com/) guys, especially for the [chainpoint-parse](https://github.com/chainpoint/chainpoint-parse) JS lib which led me to understand how
+Thanks to the [Tierion](https://tierion.com/) team, especially for the [chainpoint-parse](https://github.com/chainpoint/chainpoint-parse) JS lib which led me to understand how
 a chainpoint document is put together.

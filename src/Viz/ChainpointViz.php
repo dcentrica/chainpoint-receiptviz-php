@@ -7,21 +7,27 @@ use Dcentrica\Viz\HashUtils as HU;
 
 /**
  * @author  Russell Michell 2018 <russ@theruss.com>
- * @package chainpoint-viz
+ * @package chainpoint-receiptviz-php
  * @license BSD-3
  *
- * Works with v3 Chainpoint Receipts and Graphviz libraries to produce simple
+ * Works with v3 Chainpoint Receipts and the Graphviz libraries to produce simple
  * visual representations of chainpoint data in any image format supported by
  * Graphviz itself.
  *
- * Hat-tip to the chainpoint-parse JS project for guidance on how to construct
- * hashes in accordance with a chainpoint proof.
- * @see https://github.com/chainpoint/chainpoint-parse
- *
- * @todo Refactor all configuration setters into a single setOpts($k, $v) method.
+ * Hat-tip to the chainpoint/chainpoint-parse JS project for guidance on how to
+ * construct hashes in accordance with a chainpoint JSON-LD proof.
+ * @see https://github.com/chainpoint/chainpoint-parse.
  */
 class ChainpointViz
 {
+
+    /**
+     * The value used to decide from how many ops behind the first occurrence of a
+     * sha256d ('sha-256-x2') hash, we need to go to obtain the OP_RETURN value.
+     *
+     * @const int
+     */
+    const CHAINPOINT_OP_POINT = 3;
 
     /**
      * Configuration params, modified by individual setters.
@@ -33,17 +39,12 @@ class ChainpointViz
     protected $format = 'png';
     protected $filename = 'chainpoint';
 
-    /**
-     * The value used to decide from how many ops behind the first occurrence of a
-     * sha256d ('sha-256-x2') hash, we need to go to obtain the OP_RETURN value.
-     *
-     * @const int
-     */
-    const CHAINPOINT_OP_POINT = 3;
+    private $has256x2 = false;
+    private $btcTxIdOpIndex = 0;
 
     /**
-     * @param  string $proof The Chainpoint Proof JSON document as a JSON string.
-     * @param  string $chain The blockchain backend to use e.g. 'bitcoin'.
+     * @param  string $receipt The Chainpoint Proof JSON document as a JSON string.
+     * @param  string $chain   The blockchain backend to use e.g. 'bitcoin'.
      * @return void
      */
     public function __construct(string $receipt = '', string $chain = '')
@@ -110,6 +111,8 @@ class ChainpointViz
     }
 
     /**
+     * Simple getter.
+     *
      * @return string The current chainpoint receipt
      */
     public function getReceipt(): string
@@ -118,6 +121,8 @@ class ChainpointViz
     }
 
     /**
+     * Simple getter.
+     *
      * @return string The current chain
      */
     public function getChain(): string
@@ -126,7 +131,7 @@ class ChainpointViz
     }
 
     /**
-     * Processes all the branch arrays from the chainpoint receipt and generate
+     * Processes all the branch arrays from the chainpoint receipt and generates
      * a dot file for consumption by the GraphViz "dot" utility.
      *
      * The dot file is consumed by the Graphviz `dot` program to generate graphical
@@ -136,17 +141,21 @@ class ChainpointViz
      * This logic has been adapted for PHP from the github.com/chainpoint/chainpoint-parse
      * project.
      *
-     * @return string         A stringy representation of a dotfile for use by Graphviz.
+     * @return string    A stringy representation of a dotfile for use by Graphviz.
      * @throws Exception
      */
     public function parseBranches(): string
     {
+        $startHash = $this->getHash();
         $currHashVal = HU::buffer_from($this->getHash(), 'hex');
         $currHashViz = HU::buffer_digest_from($currHashVal);
 
         // Output graphic fill styles
         $nodeStyle = false;
-        $label = 'Start Hash:';
+        // Highlights for key items:
+        // 1. Start Hash
+        // 2. Merkle Root
+        // 3. OP_RETURN
         $nodeStyleMarkup = ',style="filled", fillcolor="#000000", fontcolor="#FFFFFF"';
         $receipt = json_decode($this->getReceipt(), true);
 
@@ -157,7 +166,7 @@ class ChainpointViz
             'label="A Visual Representation of a v%d Chainpoint Proof"',
             '// Generated on: %s',
             'node [shape="record"]',
-            'node0 [label="<f0>%s|<f1>%s" %s];',
+            'node0 [label="<f0>Start Hash:|<f1>%s" %s];',
             '%s',
             '"node0":f1 -> "node1":f1;',
             '%s',
@@ -165,7 +174,6 @@ class ChainpointViz
             ]),
             $this->chainpointVersion($receipt),
             date('Y-m-d H:i:s'),
-            $label,
             $currHashViz,
             $nodeStyleMarkup,
             '%s',
@@ -175,6 +183,7 @@ class ChainpointViz
         // Process the desired "ops" arrays
         $ops = $this->getOps();
         $total = sizeof($ops[0]) + sizeof($ops[1]);
+        $btcAnchorInfo = [];
 
         // Init the dotfile's sections
         $dotFileArr = ['s1' => [], 's2' => []];
@@ -212,10 +221,16 @@ class ChainpointViz
                             $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
                             $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
                             $currHashViz = HU::buffer_digest_from($currHashVal);
+
+                            if (!$this->has256x2) {
+                                $this->has256x2 = true;
+                            }
+
                             break;
                     }
                 } else if ($op === 'anchors') {
-                    if ($val[0]['type'] !== 'cal') {
+                    if ($val[0]['type'] === 'btc') {
+                        // Determine the Merkle Root
                         $label = 'Merkle Root:';
                         // Merkle Root
                         $nodeStyle = true;
@@ -248,6 +263,24 @@ class ChainpointViz
 
                 $i++;
             }
+
+            // Derive the OP_RETURN value from the value at the first sha-256-x2
+            if (!$this->has256x2) {
+                $btcAnchorInfo = $this->getBtcAnchorInfo($currHashViz, $this->getOps()[1]);
+
+                // Append OP_RETURN to the dotfile's sections
+                array_push($dotFileArr['s1'], sprintf(
+                    'node%d [ label="<f0>OP_RETURN:|<f1>%s" %s ];',
+                    ($total + 1),
+                    $btcAnchorInfo['opr'],
+                    $nodeStyleMarkup
+                ));
+                array_push($dotFileArr['s2'], sprintf(
+                    '"node%d":f0 -> "node%d":f0;',
+                    (sizeof($this->getOps()[0]) + $this->btcTxIdOpIndex),
+                    ($total + 1)
+                ));
+            }
         }
 
         // Assemble the two dotfile sections
@@ -256,6 +289,80 @@ class ChainpointViz
             implode(PHP_EOL, $dotFileArr['s1']),
             implode(PHP_EOL, $dotFileArr['s2'])
         );
+    }
+
+    /**
+     * Parse the BTC ops-branch in order to calculate the OP_RETURN and BTC TXID
+     * values.
+     *
+     * @param  string $startHash
+     * @param  array  $btcOps
+     * @return array
+     */
+    public function getBtcAnchorInfo(string $startHash, array $btcOps) : array
+    {
+        $currHashVal = HU::buffer_from($startHash, 'hex');
+        $opResultTable = [];
+        $i = 0;
+
+        foreach ($btcOps as $val) {
+            list ($op, $val) = [key($val), current($val)];
+
+            if ($op === 'r') {
+                // Hex data is treated as hex. Otherwise it's converted to bytes assuming a utf8 encoded string
+                $concatValue = HU::is_hex($val) ? HU::buffer_from($val, 'hex') : HU::buffer_from($val, 'utf8');
+                $currHashVal = HU::buffer_concat($currHashVal, $concatValue);
+                $currHashViz = HU::buffer_digest_from($currHashVal);
+                $opResultTable[] = [
+                    'bin' => $currHashVal,
+                    'hex' => $currHashViz,
+                ];
+            } else if ($op === 'l') {
+                // Hex data is treated as hex. Otherwise it's converted to bytes assuming a utf8 encoded string
+                $concatValue = HU::is_hex($val) ? HU::buffer_from($val, 'hex') : HU::buffer_from($val, 'utf8');
+                $currHashVal = HU::buffer_concat($concatValue, $currHashVal);
+                $currHashViz = HU::buffer_digest_from($currHashVal);
+                $opResultTable[] = [
+                    'bin' => $currHashVal,
+                    'hex' => $currHashViz,
+                ];
+            } else if ($op === 'op') {
+                switch ($val) {
+                    case 'sha-256':
+                        $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
+                        $currHashViz = HU::buffer_digest_from($currHashVal);
+                        $opResultTable[] = [
+                            'bin' => $currHashVal,
+                            'hex' => $currHashViz,
+                        ];
+                        break;
+                    case 'sha-256-x2':
+                        $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
+                        $currHashVal = HU::buffer_from(hash('sha256', HU::buffer_to_bin($currHashVal)), 'hex');
+                        $currHashViz = HU::buffer_digest_from($currHashVal);
+
+                        if (!$this->btcTxIdOpIndex) {
+                            $this->btcTxIdOpIndex = $i;
+                        }
+
+                        $opResultTable[] = [
+                            'bin' => $currHashVal,
+                            'hex' => $currHashViz,
+                        ];
+                        break;
+                }
+            }
+
+            $i++;
+        }
+
+        // Calculate from where to get the OP_RETURN value
+        $oprIdx = ($this->btcTxIdOpIndex - self::CHAINPOINT_OP_POINT);
+
+        return [
+            'opr' => $oprIdx >0 ? $opResultTable[$oprIdx]['hex'] : null,
+            'txid' => null,
+        ];
     }
 
     /**
