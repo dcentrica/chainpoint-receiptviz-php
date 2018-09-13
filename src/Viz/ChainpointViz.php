@@ -4,6 +4,7 @@ namespace Dcentrica\Viz;
 
 use \Exception;
 use Dcentrica\Viz\HashUtils as HU;
+use Dcentrica\Graphviz\GraphvizUtils as GU;
 
 /**
  * @author  Russell Michell 2018 <russ@theruss.com>
@@ -131,6 +132,22 @@ class ChainpointViz
     }
 
     /**
+     * Build an HTML table of metadata pertinent to the current receipt.
+     *
+     * @return string
+     */
+    private function metaTable() : string
+    {
+        $data = [
+            'NIST Timestamp' => 'foo',
+            'Chainpoint Submission Date' => json_decode($this->getReceipt(), true)['hash_submitted_node_at'],
+            'BTC Timestsamp' => 'foobar',
+        ];
+
+        return GU::table($data);
+    }
+
+    /**
      * Processes all the branch arrays from the chainpoint receipt and generates
      * a dot file for consumption by the GraphViz "dot" utility.
      *
@@ -146,7 +163,6 @@ class ChainpointViz
      */
     public function parseBranches(): string
     {
-        $startHash = $this->getHash();
         $currHashVal = HU::buffer_from($this->getHash(), 'hex');
         $currHashViz = HU::buffer_digest_from($currHashVal);
 
@@ -162,8 +178,9 @@ class ChainpointViz
         // Prepare a dot file template
         $dotTpl = sprintf(implode(PHP_EOL, [
             'digraph G {',
+            '%s',
             'labelloc="t";',
-            'label="A Visual Representation of a v%d Chainpoint Proof"',
+            'label="Visual Representation of a v%d Chainpoint Proof"',
             '// Generated on: %s',
             'node [shape="record"]',
             'node0 [label="<f0>Start Hash:|<f1>%s" %s];',
@@ -172,6 +189,7 @@ class ChainpointViz
             '%s',
             '}'
             ]),
+            $this->metaTable(),
             $this->chainpointVersion($receipt),
             date('Y-m-d H:i:s'),
             $currHashViz,

@@ -4,7 +4,7 @@ namespace Dcentrica\Viz;
 
 /**
  * @author  Russell Michell 2018 <russ@theruss.com>
- * @package dcentrica-chainpoint-tools
+ * @package chainpoint-receiptviz-php
  * @license BSD-3
  *
  * Rather simple conversion and transformation routines for chainpoint hashes,
