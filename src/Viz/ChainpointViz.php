@@ -39,7 +39,16 @@ class ChainpointViz
     protected $format = 'png';
     protected $filename = 'chainpoint';
 
+    /**
+     *
+     * @var bool
+     */
     private $has256x2 = false;
+
+    /**
+     *
+     * @var int
+     */
     private $btcTxIdOpIndex = 0;
 
     /**
@@ -146,7 +155,6 @@ class ChainpointViz
      */
     public function parseBranches(): string
     {
-        $startHash = $this->getHash();
         $currHashVal = HU::buffer_from($this->getHash(), 'hex');
         $currHashViz = HU::buffer_digest_from($currHashVal);
 
