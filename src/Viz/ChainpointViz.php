@@ -150,10 +150,12 @@ class ChainpointViz
      * This logic has been adapted for PHP from the github.com/chainpoint/chainpoint-parse
      * project.
      *
-     * @return string    A stringy representation of a dotfile for use by Graphviz.
+     * @param  bool      $anchorOnly  Just return BTC anchor data. Do not produce a dotfile.
+     * @return mixed     string|array A stringy representation of a dotfile for use by Graphviz.
+     *                                Or an array of BTC anchor info.
      * @throws Exception
      */
-    public function parseBranches(): string
+    public function parseBranches(bool $anchorOnly = false): string
     {
         $currHashVal = HU::buffer_from($this->getHash(), 'hex');
         $currHashViz = HU::buffer_digest_from($currHashVal);
@@ -272,9 +274,13 @@ class ChainpointViz
                 $i++;
             }
 
-            // Derive the OP_RETURN value from the value at the first sha-256-x2
+            // Derive the OP_RETURN value from the value located at the first sha-256-x2
             if (!$this->has256x2) {
                 $btcAnchorInfo = $this->getBtcAnchorInfo($currHashViz, $this->getOps()[1]);
+
+                if ($anchorOnly !== false) {
+                    return $btcAnchorInfo;
+                }
 
                 // Append OP_RETURN to the dotfile's sections
                 array_push($dotFileArr['s1'], sprintf(
@@ -287,6 +293,19 @@ class ChainpointViz
                     '"node%d":f0 -> "node%d":f0;',
                     (sizeof($this->getOps()[0]) + $this->btcTxIdOpIndex),
                     ($total + 1)
+                ));
+
+                // Append TXID to the dotfile's sections
+                array_push($dotFileArr['s1'], sprintf(
+                    'node%d [ label="<f0>TXID:|<f1>%s" %s ];',
+                    ($total + 2),
+                    $btcAnchorInfo['txid'],
+                    $nodeStyleMarkup
+                ));
+                array_push($dotFileArr['s2'], sprintf(
+                    '"node%d":f0 -> "node%d":f0;',
+                    (sizeof($this->getOps()[0]) + $this->btcTxIdOpIndex),
+                    ($total + 2)
                 ));
             }
         }
@@ -364,13 +383,47 @@ class ChainpointViz
             $i++;
         }
 
-        // Calculate from where to get the OP_RETURN value
+        // Calculate from where to get the OP_RETURN and TXID values
         $oprIdx = ($this->btcTxIdOpIndex - self::CHAINPOINT_OP_POINT);
 
         return [
             'opr' => $oprIdx >0 ? $opResultTable[$oprIdx]['hex'] : null,
-            'txid' => null,
+            'txid' => HU::switch_endian($opResultTable[$oprIdx]['hex']),
         ];
+    }
+
+    /**
+     * Fetch the BTC transaction ID (TXID).
+     *
+     * @return string
+     * @throws Exception
+     */
+    public function getBtcTXID() : string
+    {
+        $parsed = $this->parseBranches(true);
+
+        if (!is_array($parsed) || empty($parsed['txid'])) {
+            throw new \Exception('Unable to obtain BTC TXID!');
+        }
+
+        return $parsed['txid'];
+    }
+
+    /**
+     * Fetch the BTC OP_RETURN data saved to the BTC blockchain.
+     *
+     * @return string
+     * @throws Exception
+     */
+    public function getBtcOpReturn() : string
+    {
+        $parsed = $this->parseBranches(true);
+
+        if (!is_array($parsed) || empty($parsed['opr'])) {
+            throw new \Exception('Unable to obtain BTC OP_RETURN!');
+        }
+
+        return $parsed['opr'];
     }
 
     /**

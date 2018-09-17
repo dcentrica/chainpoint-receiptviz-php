@@ -18,6 +18,7 @@ There are several chainpoint specification versions, with a version 4 currently 
 
 ## Usage
 
+    #!/usr/bin/php
     <?php
     // Very basic usage
     require(realpath(__DIR__ . '/dcentrica-chainpoint-viz/src/Viz/ChainpointViz.php'));

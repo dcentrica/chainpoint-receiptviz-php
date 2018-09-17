@@ -1,3 +1,4 @@
+#!/usr/bin/php
 <?php
 
 require(realpath(__DIR__ . '/dcentrica-chainpoint-viz/src/Viz/ChainpointViz.php'));
