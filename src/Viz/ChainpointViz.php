@@ -291,7 +291,7 @@ class ChainpointViz
                 ));
                 array_push($dotFileArr['s2'], sprintf(
                     '"node%d":f0 -> "node%d":f0;',
-                    (sizeof($this->getOps()[0]) + $this->btcTxIdOpIndex),
+                    (sizeof($this->getOps()[0]) + $this->btcTxIdOpIndex + 1),
                     ($total + 1)
                 ));
 
@@ -304,7 +304,7 @@ class ChainpointViz
                 ));
                 array_push($dotFileArr['s2'], sprintf(
                     '"node%d":f0 -> "node%d":f0;',
-                    (sizeof($this->getOps()[0]) + $this->btcTxIdOpIndex),
+                    ($total + 1),
                     ($total + 2)
                 ));
             }
