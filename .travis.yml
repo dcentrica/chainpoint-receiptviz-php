@@ -1,0 +1,17 @@
+language: php
+
+php:
+  - 7.0
+  - 7.1
+  - 7.2
+
+before_script:
+  - composer self-update || true
+  - composer install --prefer-dist --no-interaction --no-progress --no-suggest --optimize-autoloader --verbose --profile
+
+script:
+  - phpunit --testsuite default
+
+branches:
+  only: 
+    - master
