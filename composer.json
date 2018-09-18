@@ -24,7 +24,9 @@
         "installer-name": "chainpoint-receiptviz-php"
     },
     "autoload": {
-        "psr-4": {"Viz\\": "src/"}
+        "psr-4": {
+            "Dcentrica\\Viz\\": "src/"
+        }
     },
     "minimum-stability": "dev"
 }
