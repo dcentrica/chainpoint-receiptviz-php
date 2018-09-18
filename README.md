@@ -29,8 +29,7 @@ There are several chainpoint specification versions, with a version 4 currently 
     $viz = new \Dcentrica\Viz\ChainpointViz();
     $viz->setChain('bitcoin');
     $viz->setReceipt($receipt);
-    $viz->setFormat('svg');
-    $viz->setFilename(realpath(__DIR__) . '/chainpoint');
+    $viz->setFilename(realpath(__DIR__) . '/chainpoint.svg');
     $viz->visualize();
 
 See the "examples" directory for this example and output.

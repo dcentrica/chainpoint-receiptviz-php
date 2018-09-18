@@ -36,7 +36,6 @@ class ChainpointViz
      */
     protected $chain = 'bitcoin';
     protected $receipt = '';
-    protected $format = 'png';
     protected $filename = 'chainpoint';
 
     /**
@@ -93,16 +92,15 @@ class ChainpointViz
     }
 
     /**
-     * Set the desired output image format.
+     * Get the desired output image format.
      *
-     * @param  string $format Can be any format supported by Graphviz.
-     * @return ChainpointViz
+     * @return string
      */
-    public function setFormat(string $format): ChainpointViz
+    public function getFormat(): string
     {
-        $this->format = $format;
+        $output = explode('.', $this->filename);
 
-        return $this;
+        return strtolower(end($output));
     }
 
     /**
@@ -150,9 +148,10 @@ class ChainpointViz
      * This logic has been adapted for PHP from the github.com/chainpoint/chainpoint-parse
      * project.
      *
-     * @param  bool      $anchorOnly  Just return BTC anchor data. Do not produce a dotfile.
-     * @return mixed     string|array A stringy representation of a dotfile for use by Graphviz.
-     *                                Or an array of BTC anchor info.
+     * @param  bool   $anchorOnly  Just return BTC anchor data. Do not produce a dotfile.
+     * @return string A string representation of a dotfile for use by Graphviz
+     *                or a serialized comprising OP_RETURN and TXID values, if
+     *                $anchorOnly is passed and is not false.
      * @throws Exception
      */
     public function parseBranches(bool $anchorOnly = false): string
@@ -279,7 +278,7 @@ class ChainpointViz
                 $btcAnchorInfo = $this->getBtcAnchorInfo($currHashViz, $this->getOps()[1]);
 
                 if ($anchorOnly !== false) {
-                    return $btcAnchorInfo;
+                    return serialize($btcAnchorInfo);
                 }
 
                 // Append OP_RETURN to the dotfile's sections
@@ -400,9 +399,9 @@ class ChainpointViz
      */
     public function getBtcTXID() : string
     {
-        $parsed = $this->parseBranches(true);
+        $parsed = unserialize($this->parseBranches(true));
 
-        if (!is_array($parsed) || empty($parsed['txid'])) {
+        if (!$parsed || empty($parsed['txid'])) {
             throw new \Exception('Unable to obtain BTC TXID!');
         }
 
@@ -417,9 +416,9 @@ class ChainpointViz
      */
     public function getBtcOpReturn() : string
     {
-        $parsed = $this->parseBranches(true);
+        $parsed = unserialize($this->parseBranches(true));
 
-        if (!is_array($parsed) || empty($parsed['opr'])) {
+        if (!$parsed || empty($parsed['opr'])) {
             throw new \Exception('Unable to obtain BTC OP_RETURN!');
         }
 
@@ -431,15 +430,17 @@ class ChainpointViz
      * to a pre-determined F/S location.
      *
      * @return int 1 on failure, zero otherwise.
+     * @throws Exception
      */
     public function visualise(): int
     {
-        $format = $this->format;
-        $filename = sprintf(
-            '%s.%s', str_replace('.', '', $this->filename), strtolower($this->format)
-        );
+        $format = $this->getFormat();
+        $filename = $this->filename;
         $dotFile = sprintf('/tmp/%s.dot', hash('sha256', bin2hex(random_bytes(16))));
-        file_put_contents($dotFile, $this->parseBranches());
+
+        if (!file_put_contents($dotFile, $this->parseBranches())) {
+            throw new Exception('Unable to write dotfile.');
+        }
 
         $output = [];
         $return = 0;

@@ -9,6 +9,5 @@ $receipt = file_get_contents('chainpoint.json');
 $viz = new \Dcentrica\Viz\ChainpointViz();
 $viz->setChain('bitcoin');
 $viz->setReceipt($receipt);
-$viz->setFormat('svg');
-$viz->setFilename(realpath(__DIR__) . '/chainpoint');
+$viz->setFilename(realpath(__DIR__) . '/chainpoint.svg');
 $viz->visualize();
