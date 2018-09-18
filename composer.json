@@ -25,7 +25,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Dcentrica\\Viz\\": "src/"
+            "Dcentrica\\": "src/"
         }
     },
     "minimum-stability": "dev"
