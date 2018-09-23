@@ -387,7 +387,7 @@ class ChainpointViz
 
         return [
             'opr' => $oprIdx >0 ? $opResultTable[$oprIdx]['hex'] : null,
-            'txid' => HU::switch_endian($opResultTable[$oprIdx]['hex']),
+            'txid' => HU::switch_endian($opResultTable[$this->btcTxIdOpIndex]['hex']),
         ];
     }
 
