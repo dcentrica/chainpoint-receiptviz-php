@@ -37,6 +37,7 @@ class ChainpointViz
     protected $chain = 'bitcoin';
     protected $receipt = '';
     protected $filename = 'chainpoint';
+    protected $explorer = '';
 
     /**
      *
@@ -115,6 +116,42 @@ class ChainpointViz
         $this->filename = $filename;
 
         return $this;
+    }
+
+    /**
+     * Setter to control the blockchain explorer in-use for linking important
+     * hashes in SVG documents. Has no effect for formats other than SVG.
+     *
+     * @param string
+     * @return ChainpointViz
+     */
+    public function setExplorer(string $url) : ChainpointViz
+    {
+        $this->explorer = $url;
+
+        return $this;
+    }
+
+    /**
+     * Getter equivalent of setExplorer(). Only works for TXID lookups.
+     *
+     * @return string
+     */
+    public function getExplorer() : string
+    {
+        switch ($explorer = $this->explorer) {
+            case 'blockexplorer.com':
+            case 'smartbit.com.au':
+                $uri = '/tx/';
+                break;
+            default:
+            case 'blockchain.com':
+            case 'explorer.bitcoin.com':
+                $uri = '/btc/tx/';
+                break;
+        }
+
+        return $explorer ? sprintf('https://%s%s', $explorer, $uri) : '';
     }
 
     /**
@@ -296,10 +333,11 @@ class ChainpointViz
 
                 // Append TXID to the dotfile's sections
                 array_push($dotFileArr['s1'], sprintf(
-                    'node%d [ label="<f0>TXID:|<f1>%s" %s ];',
+                    'node%d [ label="<f0>TXID:|<f1>%s" %s %s ];',
                     ($total + 2),
                     $btcAnchorInfo['txid'],
-                    $nodeStyleMarkup
+                    $nodeStyleMarkup,
+                    $this->getExplorer() ? sprintf(',  href="%s%s"', $this->getExplorer(), $btcAnchorInfo['txid']) : ''
                 ));
                 array_push($dotFileArr['s2'], sprintf(
                     '"node%d":f0 -> "node%d":f0;',

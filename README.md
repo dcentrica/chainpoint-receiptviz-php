@@ -30,6 +30,9 @@ There are several chainpoint specification versions, with a version 4 currently 
     $viz->setChain('bitcoin');
     $viz->setReceipt($receipt);
     $viz->setFilename(realpath(__DIR__) . '/chainpoint.svg');
+    // Create linked TXIDs (Only works for SVG output). Options are:
+    // blockchain.com | explorer.bitcoin.com | blockexplorer.com | smartbit.com.au
+    $viz->setExplorer('smartbit.com.au');
     $viz->visualize();
 
 See the "examples" directory for this example and output.
