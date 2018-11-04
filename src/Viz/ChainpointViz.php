@@ -58,10 +58,6 @@ class ChainpointViz
      */
     public function __construct(string $receipt = '', string $chain = '')
     {
-        if (!self::which('dot')) {
-            throw new Exception('Graphviz dot program not available!');
-        }
-
         $this->setReceipt($receipt);
         $this->setChain($chain);
     }
@@ -478,6 +474,10 @@ class ChainpointViz
 
         if (!file_put_contents($dotFile, $this->parseBranches())) {
             throw new Exception('Unable to write dotfile.');
+        }
+
+        if (!self::which('dot')) {
+            throw new Exception('Graphviz dot program not available!');
         }
 
         $output = [];
